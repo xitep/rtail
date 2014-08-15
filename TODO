@@ -1,0 +1,16 @@
+* Logic based on the 'Expired' header
+  - Need to adjust for the time difference between server and client
+    based on the "Date" header field from the previous request
+
+* Support specifying lines instead of bytes only.
+  - We can achieve operating on line level by getting a little bit more
+    data bytes and then filtering within the application before producing
+    outout.
+
+* Support a --continue option together with --output <file> ... to
+  automatically start fetching the remote resource as of the offset
+  of the named output file and then append to the file (instead of
+  overriting it as now).  In the same spirit as wget's -c.
+
+* Support a --separator option to print some separator between
+  served chunks of data.
