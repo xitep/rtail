@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	version = "1.2"
+	version = "1.2-dev"
 )
 
 func main() {
@@ -24,9 +24,10 @@ func main() {
 	dumpHeaders := flag.Bool("dump-headers", false, "Dump request/response headers to stderr")
 	follow := flag.BoolP("follow", "f", false, "Output appended data as the remote file grows")
 	sleep := flag.IntP("sleep-interval", "s", 5, "With --follow check for appendeded data approximately every N seconds")
-	printVersion := flag.BoolP("version", "v", false, "Print version and quit")
+	printVersion := flag.BoolP("version", "", false, "Print version and quit")
 	lbytes := flag.StringP("bytes", "c", "1K", "output the last N bytes")
 	output := flag.StringP("output", "o", "-", "Write output to named file")
+	separator := flag.StringP("separator", "", "", "Write separator between outputs")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -97,6 +98,7 @@ func main() {
 		},
 		userAgent:           "rtail/" + version,
 		outputFile:          *output,
+		separator:           *separator,
 		tick:                *sleep,
 		byteOffset:          lbytesValue,
 		byteOffsetFromStart: lbytesValueFromStart,

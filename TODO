@@ -11,6 +11,3 @@
   automatically start fetching the remote resource as of the offset
   of the named output file and then append to the file (instead of
   overriting it as now).  In the same spirit as wget's -c.
-
-* Support a --separator option to print some separator between
-  served chunks of data.

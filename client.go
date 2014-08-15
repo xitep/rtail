@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,10 @@ type client struct {
 	// if not empty, append data to the specified file name
 	// if empty, write data to stdout
 	outputFile string
+
+	// if not empty, will be written to the output channel before
+	// newly arrived data
+	separator string
 
 	// offset at which to start producing the remote resource
 	byteOffset int64
@@ -47,10 +52,11 @@ type fetchState struct {
 	offset       int64     // the current offset in the remote file
 	lastModified time.Time // the lastModified timestamp of remote file
 	expires      time.Time // the timestamp when the remote file's caching expires
+
+	separator []byte
 }
 
 func (c *client) tail(resource string) error {
-
 	var state fetchState
 	if err := c.initFetch(&state, resource); err != nil {
 		return err
@@ -95,10 +101,10 @@ func (c *client) initFetch(s *fetchState, resource string) error {
 	s.offset = 0
 	s.lastModified = time.Time{}
 	s.expires = time.Time{}
+	s.separator = prepareSeparator(c.separator, resource)
 
-	// ~ no need to make the additional head request if the user
-	// gave us the exactly the offset as of which we are supposed
-	// to tail :)
+	// ~ no need to make the additional head request if the user gave
+	// us exactly the offset as of which we are supposed to tail :)
 	if c.byteOffsetFromStart {
 		s.offset = c.byteOffset
 		return nil
@@ -115,6 +121,71 @@ func (c *client) initFetch(s *fetchState, resource string) error {
 		}
 	}
 	return nil
+}
+
+func prepareSeparator(fmt string, resource string) []byte {
+	if len(fmt) == 0 {
+		return nil
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, len(fmt)+len(resource)+2))
+	// ~ ensure an extra newline at the beginning of the separator
+	buf.WriteRune('\n')
+
+	escape := rune(0)
+	for _, c := range fmt {
+		if escape == '\\' {
+			switch c {
+			case 'a':
+				c = '\a'
+			case 'b':
+				c = '\b'
+			case 'f':
+				c = '\f'
+			case 'n':
+				c = '\n'
+			case 't':
+				c = '\t'
+			case 'v':
+				c = '\v'
+			case '\\':
+				c = '\\'
+			default:
+				// ~ take c literarly without emitting the preivous backslash
+			}
+			escape = 0 // ~ reset escape char
+			buf.WriteRune(c)
+			continue
+		} else if escape == '%' {
+			switch c {
+			case '%':
+				buf.WriteRune(c)
+			case 'u':
+				buf.WriteString(resource)
+			default:
+				buf.WriteRune(escape)
+				buf.WriteRune(c)
+			}
+			escape = 0 // ~ reset escape char
+			continue
+		}
+		if c == '\\' || c == '%' {
+			// ~ don't output any escape char at this moment
+			escape = c
+		} else {
+			buf.WriteRune(c)
+		}
+	}
+	// ~ the '%' escape always produces itself, the backslash escape
+	// itself is always swallowed; here we handle the case when the
+	// '%' escape is the last character of the fmt string
+	if escape == '%' {
+		buf.WriteRune(escape)
+	}
+
+	// ~ ensure an extra newline at the end of the separator
+	buf.WriteRune('\n')
+	return buf.Bytes()
 }
 
 func max(a, b int64) int64 {
@@ -155,6 +226,12 @@ func (c *client) fetch(s *fetchState, out io.Writer) error {
 			}
 		}
 		// ~ process the received content
+		if resp.ContentLength != 0 && len(c.separator) != 0 {
+			// write the separator if its defined and the
+			// content-length of the response is either unknown or
+			// greater than zero
+			out.Write(s.separator)
+		}
 		n, err := io.Copy(out, resp.Body)
 		s.offset += n // remember how much we copied to out
 		return err
