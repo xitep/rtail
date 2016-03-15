@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/xitep/gopass"
+	"github.com/mewbak/gopass"
 	"crypto/tls"
 	"errors"
 	"fmt"
